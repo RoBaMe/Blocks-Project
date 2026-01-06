@@ -30,6 +30,7 @@
         "cookie-parser": "^1.4.7",
         "lowdb": "^7.0.1",
         "nestjs-zod": "^5.1.0",
+        "openai": "^6.15.0",
         "react-hot-toast": "^2.6.0",
         "reflect-metadata": "^0.2.2",
         "rxjs": "^7.8.1",
