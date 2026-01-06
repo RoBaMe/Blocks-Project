@@ -36,14 +36,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setUser(response.user);
     };
 
-    const logout = () => {
+    const logout = async () => {
+        await authApi.logout();
         setUser(null);
-        // TODO: Call logout endpoint to clear cookie
     };
 
-    return (
-        <AuthContext.Provider value={{ user, isLoading, login, logout }}>{children}</AuthContext.Provider>
-    );
+    return <AuthContext.Provider value={{ user, isLoading, login, logout }}>{children}</AuthContext.Provider>;
 }
 
 export function useAuth() {

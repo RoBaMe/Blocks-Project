@@ -92,4 +92,22 @@ export class AuthController {
         }
         return { user };
     }
+
+    @Post('logout')
+    @HttpCode(HttpStatus.OK)
+    @UseGuards(JwtAuthGuard)
+    @ApiOperation({ summary: 'Logout user' })
+    @ApiResponse({
+        status: 200,
+        description: 'Logout successful',
+    })
+    @ApiResponse({ status: 401, description: 'Unauthorized' })
+    async logout(@Res({ passthrough: true }) res: Response): Promise<{ message: string }> {
+        res.clearCookie('auth_token', {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: 'lax',
+        });
+        return { message: 'Logout successful' };
+    }
 }

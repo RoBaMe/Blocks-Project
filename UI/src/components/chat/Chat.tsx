@@ -1,29 +1,23 @@
 import { useState, useRef, useEffect } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
-import { useNavigate } from 'react-router-dom';
+import { chatApi, type ChatMessage } from '../../services/api';
 import './Chat.css';
-
-interface Message {
-    id: string;
-    role: 'user' | 'assistant';
-    content: string;
-    timestamp: Date;
-}
+import toast from 'react-hot-toast';
 
 function Chat() {
-    const { user } = useAuth();
-    const navigate = useNavigate();
-    const [messages, setMessages] = useState<Message[]>([]);
+    const { user, logout } = useAuth();
+    const [messages, setMessages] = useState<ChatMessage[]>([]);
     const [input, setInput] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const messagesEndRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
-        if (!user) {
-            navigate('/login');
-            return;
-        }
-    }, [user, navigate]);
+        const fetchMessages = async () => {
+            const response = await chatApi.getChatHistory();
+            setMessages(response.messages);
+        };
+        fetchMessages();
+    }, []);
 
     useEffect(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -33,65 +27,67 @@ function Chat() {
         e.preventDefault();
         if (!input.trim() || isLoading) return;
 
-        const userMessage: Message = {
-            id: Date.now().toString(),
-            role: 'user',
-            content: input.trim(),
-            timestamp: new Date(),
-        };
-
-        setMessages((prev) => [...prev, userMessage]);
+        const messageContent = input.trim();
         setInput('');
         setIsLoading(true);
 
-        // TODO: Replace with actual AI API call
-        // Simulating AI response for now
-        setTimeout(() => {
-            const aiMessage: Message = {
-                id: (Date.now() + 1).toString(),
-                role: 'assistant',
-                content: `I received your message: "${userMessage.content}". This is a placeholder response. Connect to your AI service to get real responses.`,
-                timestamp: new Date(),
+        try {
+            const tempUserMessage: ChatMessage = {
+                id: `temp-${Date.now()}`,
+                userId: user?.id || '',
+                side: 'user',
+                content: messageContent,
+                timestamp: new Date().toISOString(),
             };
-            setMessages((prev) => [...prev, aiMessage]);
-            setIsLoading(false);
-        }, 1000);
-    };
+            setMessages((prev) => [...prev, tempUserMessage]);
 
-    if (!user) {
-        return null;
-    }
+            const botMessage = await chatApi.sendMessage({ content: messageContent });
+
+            setMessages((prev) => [...prev, botMessage]);
+        } catch (error) {
+            toast.error(`Failed to send message: ${error}`);
+        } finally {
+            setIsLoading(false);
+        }
+    };
 
     return (
         <div className="chat-container">
             <div className="chat-header">
-                <h1>AI Chat</h1>
-                <p className="chat-user-info">Welcome, {user.name}!</p>
+                <div className="chat-header-content">
+                    <div>
+                        <h1>Math AI Chat</h1>
+                        <p className="chat-user-info">Welcome, {user?.name}!</p>
+                    </div>
+                    <button onClick={logout} className="logout-button">
+                        Logout
+                    </button>
+                </div>
             </div>
 
             <div className="chat-messages">
                 {messages.length === 0 && (
                     <div className="chat-empty">
                         <p>Start a conversation with AI</p>
-                        <p className="chat-hint">Ask me anything!</p>
+                        <p className="chat-hint">Try asking me to sum or find the max of a list of numbers!</p>
                     </div>
                 )}
                 {messages.map((message) => (
                     <div
                         key={message.id}
-                        className={`chat-message ${message.role === 'user' ? 'user-message' : 'ai-message'}`}
+                        className={`chat-message ${message.side === 'user' ? 'user-message' : 'ai-message'}`}
                     >
                         <div className="message-content">
-                            <div className="message-role">{message.role === 'user' ? 'You' : 'AI'}</div>
+                            <div className="message-role">{message.side === 'user' ? 'You' : 'Bot'}</div>
                             <div className="message-text">{message.content}</div>
-                            <div className="message-time">{message.timestamp.toLocaleTimeString()}</div>
+                            <div className="message-time">{new Date(message.timestamp).toLocaleTimeString()}</div>
                         </div>
                     </div>
                 ))}
                 {isLoading && (
                     <div className="chat-message ai-message">
                         <div className="message-content">
-                            <div className="message-role">AI</div>
+                            <div className="message-role">Bot</div>
                             <div className="message-text typing-indicator">
                                 <span></span>
                                 <span></span>

@@ -24,13 +24,13 @@ export class OpenAIService {
 
         const toolCalls = response.output.filter((output) => output.type === 'function_call');
 
-        if (toolCalls.length === 0) throw new Error('No tool calls found');
+        if (toolCalls.length === 0) return 'No Appopriate tool found, please try again';
 
         const results = await Promise.all(
             toolCalls.map(async (toolCall) => {
                 const tool = myToolsDict[toolCall.name];
 
-                if (!tool) throw new Error(`Tool ${toolCall.name} not found`);
+                if (!tool) return `Tool ${toolCall.name} not found`;
 
                 const result = await tool.run(toolCall.arguments);
                 return result;
