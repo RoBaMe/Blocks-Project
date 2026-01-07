@@ -110,7 +110,12 @@ export const authApi = {
 };
 
 export const chatApi = {
-    async sendMessage(data: CreateMessageRequest): Promise<CreateMessageResponse> {
+    async sendMessage(
+        data: CreateMessageRequest,
+        onChunk?: (chunk: string) => void,
+        onComplete?: (message: CreateMessageResponse) => void,
+        onError?: (error: string) => void,
+    ): Promise<CreateMessageResponse> {
         const response = await fetch(`${API_BASE_URL}/chat/message`, {
             method: 'POST',
             headers: {
@@ -120,7 +125,60 @@ export const chatApi = {
             body: JSON.stringify(data),
         });
 
-        return handleResponse<CreateMessageResponse>(response);
+        if (!response.ok) {
+            const errorData = await response.json();
+            const error: ApiError = {
+                message: errorData.message || 'An error occurred',
+                errors: errorData.errors,
+            };
+            throw error;
+        }
+
+        const reader = response.body?.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+        let completeMessage: CreateMessageResponse | null = null;
+
+        if (!reader) {
+            throw new Error('Response body is not readable');
+        }
+
+        while (true) {
+            const { done, value } = await reader.read();
+
+            if (done) break;
+
+            buffer += decoder.decode(value, { stream: true });
+            const lines = buffer.split('\n\n');
+            buffer = lines.pop() || '';
+
+            for (const line of lines) {
+                if (line.startsWith('data: ')) {
+                    try {
+                        const data = JSON.parse(line.slice(6));
+
+                        if (data.type === 'chunk' && onChunk) {
+                            onChunk(data.content);
+                        } else if (data.type === 'complete') {
+                            completeMessage = data.message;
+                            if (onComplete) {
+                                onComplete(data.message);
+                            }
+                        } else if (data.type === 'error' && onError) {
+                            onError(data.message);
+                        }
+                    } catch (e) {
+                        console.error('Error parsing SSE data:', e);
+                    }
+                }
+            }
+        }
+
+        if (!completeMessage) {
+            throw new Error('No complete message received');
+        }
+
+        return completeMessage;
     },
 
     async getChatHistory(): Promise<ChatHistoryResponse> {
